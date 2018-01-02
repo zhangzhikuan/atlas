@@ -1,6 +1,5 @@
 package com.atlas
 
-import java.io.File
 import java.util
 
 import com.google.protobuf.ByteString
@@ -11,7 +10,7 @@ import org.joda.time.DateTime
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable.HashMap
+import scala.collection.mutable
 
 /**
   * 自定义atlas调度器
@@ -43,7 +42,7 @@ class AtlasScheduler(config: SchedulerConfig,
       val taskId = status.getTaskId.getValue
       status.getState match {
         case TaskState.TASK_FINISHED =>
-          logger.info(s"Received status update: taskId=$taskId state=${status.getState} message=${status.getMessage}}")
+          logger.info(s"Received status update: taskId=$taskId state=${status.getState} message=${status.getMessage} data=${status.getData.toStringUtf8}")
         case TaskState.TASK_RUNNING =>
           logger.info(s"Received status update: taskId=$taskId state=${status.getState}")
         case _ =>
@@ -57,7 +56,8 @@ class AtlasScheduler(config: SchedulerConfig,
     logger.info("Error received: " + error)
   }
 
-  val slaveIdToExecutorInfo = new HashMap[String, ExecutorInfo]()
+  val slaveIdToExecutorInfo = new mutable.HashMap[String, ExecutorInfo]()
+  //  val executorToSlaveInfo = new mutable.HashMap[String, SlaveInfo]()
 
   //核心代码
   override def resourceOffers(schedulerDriver: SchedulerDriver,
@@ -78,11 +78,11 @@ class AtlasScheduler(config: SchedulerConfig,
             .setType(Value.Type.SCALAR)
             .setScalar(Value.Scalar.newBuilder().setValue(256).build()).build()
 
-          val slaveID = offer.getSlaveId.getValue
+          val slaveID: String = offer.getSlaveId.getValue
           val executorInfo = if (slaveIdToExecutorInfo.contains(slaveID)) {
-            slaveIdToExecutorInfo(slaveID)
+            slaveIdToExecutorInfo(slaveID) //意味着一对一的关系
           } else {
-            slaveIdToExecutorInfo.put(slaveID, createExecutorInfo(s"atlas_executor_${slaveID}"))
+            slaveIdToExecutorInfo.put(slaveID, createExecutorInfo(s"atlas_executor_$slaveID"))
             slaveIdToExecutorInfo(slaveID)
           }
 
@@ -115,6 +115,10 @@ class AtlasScheduler(config: SchedulerConfig,
   //slave失效
   override def slaveLost(schedulerDriver: SchedulerDriver, slaveID: Protos.SlaveID): Unit = {
     logger.info(s"Framework slave lost on $slaveID")
+    stateLock.synchronized {
+      //删除slave到executor的映射关系
+      slaveIdToExecutorInfo.remove(slaveID.getValue)
+    }
   }
 
   //重新注册，貌似不使用
@@ -130,10 +134,14 @@ class AtlasScheduler(config: SchedulerConfig,
 
   //executor 失效，从任务角度来处理
   override def executorLost(schedulerDriver: SchedulerDriver, executorID: Protos.ExecutorID, slaveID: Protos.SlaveID, i: Int): Unit = {
-    logger.info(s"Framework slave executor on $slaveID")
+    logger.info(s"Framework slave executor lost on $slaveID")
+    stateLock.synchronized {
+      //删除slave到executor的映射关系
+      slaveIdToExecutorInfo.remove(slaveID.getValue)
+    }
   }
 
-  //不清楚
+  //当提交任务到slave的时候,恰好slave不可用，会有这个回调
   override def offerRescinded(driver: SchedulerDriver, offerId: OfferID): Unit = {
     logger.info(s"Framework offer rescinded on $offerId")
   }
@@ -161,7 +169,7 @@ class AtlasScheduler(config: SchedulerConfig,
       Some(new MesosSchedulerDriver(AtlasScheduler.this, builder.build(), config.MESOS_MASTER_URL, credential))
     } catch {
       case ex: Throwable =>
-        logger.error("failture create scheduler driver", ex)
+        logger.error("fail on create scheduler driver", ex)
         throw ex
     }
   }

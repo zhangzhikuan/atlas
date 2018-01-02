@@ -2,7 +2,8 @@ package com.atlas
 
 import com.atlas.utils.Shell.ShellCommandExecutor
 import com.google.protobuf.ByteString
-import org.apache.mesos.Protos.Status
+import org.apache.mesos.Protos.TaskStatus.Reason
+import org.apache.mesos.Protos.{Status, TaskStatus}
 import org.apache.mesos.{Executor, ExecutorDriver, MesosExecutorDriver, Protos}
 import org.slf4j.LoggerFactory
 
@@ -29,7 +30,10 @@ class AtlasExecutor extends Executor {
     new Thread() {
       override def run(): Unit = {
         try {
-          var status = Protos.TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(Protos.TaskState.TASK_RUNNING).build
+          var status = TaskStatus
+            .newBuilder.setTaskId(task.getTaskId)
+            .setState(Protos.TaskState.TASK_RUNNING)
+            .build
           driver.sendStatusUpdate(status) //更新状态
           LOG.info("Launching task {}", task.getTaskId.getValue)
           //do working
@@ -40,7 +44,13 @@ class AtlasExecutor extends Executor {
           shell.execute()
           LOG.warn(shell.getOutput)
 
-          status = Protos.TaskStatus.newBuilder.setTaskId(task.getTaskId).setState(Protos.TaskState.TASK_FINISHED).build
+          status = TaskStatus
+            .newBuilder.setTaskId(task.getTaskId)
+            .setState(Protos.TaskState.TASK_FINISHED)
+            .setMessage("msg-任务执行成功")
+            .setReason(Reason.REASON_COMMAND_EXECUTOR_FAILED)
+            .setData(ByteString.copyFromUtf8("data-任务执行成功"))
+            .build
           driver.sendStatusUpdate(status) //更新状态
         } catch {
           case e: Exception =>
