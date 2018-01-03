@@ -94,7 +94,7 @@ class AtlasScheduler(config: SchedulerConfig,
             .addResources(cpuResourcesToUse)
             .addResources(memResourcesToUse)
 
-            .setData(ByteString.copyFromUtf8("ls /tmp"))
+            .setData(ByteString.copyFromUtf8("ping www.baidu.com -c 1000"))
             .build()
           Iterator.single((offer, taskInfo))
       }

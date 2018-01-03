@@ -30,31 +30,37 @@ class AtlasExecutor extends Executor {
     new Thread() {
       override def run(): Unit = {
         try {
-          var status = TaskStatus
+          val status = TaskStatus
             .newBuilder.setTaskId(task.getTaskId)
-            .setState(Protos.TaskState.TASK_RUNNING)
-            .build
-          driver.sendStatusUpdate(status) //更新状态
-          LOG.info("Launching task {}", task.getTaskId.getValue)
-          //do working
+            .setState(Protos.TaskState.TASK_RUNNING).build
+          driver.sendStatusUpdate(status) //更新运行状态
 
-          LOG.warn(s"xxxxxxxxxxxxxxxxxxx:${task.getData.toStringUtf8}")
+          LOG.info(s"executed taskId ${task.getTaskId.getValue} command ${task.getData.toStringUtf8}")
           val command = task.getData.toStringUtf8
           val shell = new ShellCommandExecutor(command.split("\\s+"), null, null, 10L)
           shell.execute()
-          LOG.warn(shell.getOutput)
+          if (shell.getExitCode == 0) {
+            LOG.info(s"executed taskId ${task.getTaskId.getValue} output ${shell.getOutput}")
 
-          status = TaskStatus
-            .newBuilder.setTaskId(task.getTaskId)
-            .setState(Protos.TaskState.TASK_FINISHED)
-            .setMessage("msg-任务执行成功")
-            .setReason(Reason.REASON_COMMAND_EXECUTOR_FAILED)
-            .setData(ByteString.copyFromUtf8("data-任务执行成功"))
-            .build
-          driver.sendStatusUpdate(status) //更新状态
+            val status = TaskStatus
+              .newBuilder.setTaskId(task.getTaskId)
+              .setState(Protos.TaskState.TASK_FINISHED)
+              .setMessage("msg-任务执行成功")
+              .setData(ByteString.copyFromUtf8("data-任务执行成功")).build
+            driver.sendStatusUpdate(status) //更新成功状态
+          } else {
+            throw new RuntimeException(s"任务失败，返回状态为${shell.getExitCode},错误日志${shell.getOutput}")
+          }
         } catch {
           case e: Exception =>
-            LOG.error("Error starting executor", e)
+            LOG.error("Error execute task", e)
+            val status = TaskStatus
+              .newBuilder.setTaskId(task.getTaskId)
+              .setState(Protos.TaskState.TASK_FAILED)
+              .setMessage(s"msg-${e.getMessage}")
+              .setReason(Reason.REASON_COMMAND_EXECUTOR_FAILED)
+              .setData(ByteString.copyFromUtf8(s"data-${e.getMessage}")).build
+            driver.sendStatusUpdate(status) //更新失败状态
         }
       }
     }.start()
