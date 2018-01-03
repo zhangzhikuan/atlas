@@ -1,12 +1,13 @@
 package com.atlas
 
-import org.apache.curator.framework.CuratorFramework
-import org.apache.curator.framework.CuratorFrameworkFactory._
+import org.apache.curator.framework.{CuratorFramework, CuratorFrameworkFactory}
 import org.apache.curator.retry.ExponentialBackoffRetry
+import org.slf4j.LoggerFactory
 
 object CuratorUtils {
+  //zk 客户端
   def client(config: SchedulerConfig): CuratorFramework = {
-    val client = builder.connectString(config.ZK_CONNECT_ADDRESS)
+    val client = CuratorFrameworkFactory.builder.connectString(config.ZK_CONNECT_ADDRESS)
       .sessionTimeoutMs(10000)
       .connectionTimeoutMs(10000)
       .retryPolicy(new ExponentialBackoffRetry(1000, 3))
@@ -16,7 +17,10 @@ object CuratorUtils {
   }
 }
 
+//framework ID 存储
 class ZKFrameworkIDStore(client: CuratorFramework, config: SchedulerConfig) extends FrameworkIDStore {
+  private val LOG = LoggerFactory.getLogger(classOf[ZKFrameworkIDStore])
+
   override def storeFrameworkID(frameworkID: String): Unit = {
     val stat = client.checkExists()
       .creatingParentContainersIfNeeded()
@@ -29,7 +33,7 @@ class ZKFrameworkIDStore(client: CuratorFramework, config: SchedulerConfig) exte
         .creatingParentContainersIfNeeded()
         .forPath(config.ZK_FRAMEWORK_ID_PATH, frameworkID.getBytes)
 
-    print(s"""stored as frameworkID:$frameworkID""")
+    LOG.info(s"""stored as frameworkID:$frameworkID""")
   }
 
   override def getFrameworkID: Option[String] = {
@@ -43,6 +47,5 @@ class ZKFrameworkIDStore(client: CuratorFramework, config: SchedulerConfig) exte
       None
     }
   }
-
 }
 

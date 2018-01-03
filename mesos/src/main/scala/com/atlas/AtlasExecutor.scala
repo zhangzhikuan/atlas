@@ -37,7 +37,7 @@ class AtlasExecutor extends Executor {
 
           LOG.info(s"executed taskId ${task.getTaskId.getValue} command ${task.getData.toStringUtf8}")
           val command = task.getData.toStringUtf8
-          val shell = new ShellCommandExecutor(command.split("\\s+"), null, null, 10L)
+          val shell = new ShellCommandExecutor(command.split("\\s+"), null, null, 0L)
           shell.execute()
           if (shell.getExitCode == 0) {
             LOG.info(s"executed taskId ${task.getTaskId.getValue} output ${shell.getOutput}")

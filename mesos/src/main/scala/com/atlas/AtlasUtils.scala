@@ -6,8 +6,8 @@ import org.slf4j.LoggerFactory
 
 import scala.util.control.NonFatal
 
-object Utils {
-  private val log = LoggerFactory.getLogger("Utils")
+object AtlasUtils {
+  private val LOG = LoggerFactory.getLogger("Utils")
 
   /**
     * Execute a block of code that returns a value, re-throwing any non-fatal uncaught
@@ -20,10 +20,10 @@ object Utils {
       block
     } catch {
       case e: IOException =>
-        log.error("Exception encountered", e)
+        LOG.error("Exception encountered", e)
         throw e
       case NonFatal(e) =>
-        log.error("Exception encountered", e)
+        LOG.error("Exception encountered", e)
         throw new IOException(e)
     }
   }
@@ -34,7 +34,7 @@ object Utils {
       block
     } catch {
       case NonFatal(t) =>
-        log.error(s"Uncaught exception in thread ${Thread.currentThread().getName}", t)
+        LOG.error(s"Uncaught exception in thread ${Thread.currentThread().getName}", t)
     }
   }
 

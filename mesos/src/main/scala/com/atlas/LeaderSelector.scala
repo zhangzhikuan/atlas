@@ -10,11 +10,11 @@ import org.apache.curator.framework.recipes.leader.{LeaderSelectorListenerAdapte
 import org.slf4j.LoggerFactory
 
 
-class LeaderSelector(scheduler: AtlasScheduler, client: CuratorFramework, path: String
+class LeaderSelector(driver: AtlasDriver, client: CuratorFramework, path: String
                     ) extends LeaderSelectorListenerAdapter with Closeable {
 
 
-  private val log = LoggerFactory.getLogger(classOf[LeaderSelector])
+  private val LOG = LoggerFactory.getLogger(classOf[LeaderSelector])
 
   private val wait_lock = new CountDownLatch(1)
   private val started = new AtomicBoolean(false)
@@ -26,31 +26,31 @@ class LeaderSelector(scheduler: AtlasScheduler, client: CuratorFramework, path: 
     new Thread() {
       override def run(): Unit = {
         close()
-        log.info("killed by signal")
+        LOG.info("killed by signal")
         wait_lock.countDown()
       }
     }
   }
 
   @throws[Exception]
-  def start(): Unit = {
+  def run(): Unit = {
     leaderSelector.foreach {
       selector =>
         selector.start()
         started.set(true)
     }
-    log.info("leader selector is running")
+    LOG.info("leader selector is running")
     wait_lock.await()
   }
 
 
   @throws[Exception]
   protected override def takeLeadership(client: CuratorFramework): Unit = {
-    log.info("now the leader is " + InetAddress.getLocalHost.getHostName)
+    LOG.info("now the leader is " + InetAddress.getLocalHost.getHostName)
     try {
-      scheduler.run()
+      driver.run()
     } finally {
-      log.error("release leadership.")
+      LOG.error("release leadership.")
     }
   }
 

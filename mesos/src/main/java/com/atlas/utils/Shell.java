@@ -117,9 +117,11 @@ abstract public class Shell {
 
     /** check to see if a command needs to be executed and execute if needed */
     protected void run() throws IOException {
-        if (lastTime + interval > System.currentTimeMillis())
+        if(lastTime + interval > System.currentTimeMillis()) {
             return;
-        exitCode = 0; // reset for next run
+        }
+        // reset for next run
+        exitCode = 0;
         runCommand();
     }
 
